@@ -49,6 +49,27 @@ def epipolar_lines_from_f(f, pt, pt2):
     return epi_lines, distances.mean()
 
 
+def normalization_matrix(pts):
+    center = pts[..., :2].mean(axis=0)
+    diff = (pts[..., :2] - center).T
+    mean_dis = (diff[0] ** 2 + diff[1] ** 2).mean() / 2
+    s = 1 / np.sqrt(mean_dis)
+
+    trans_mat = np.array([[s, 0, -s * center[0]],
+                          [0, s, -s * center[1]],
+                          [0, 0, 1]])
+    return trans_mat
+
+
+def normalized_eight_point(pt1, pt2):
+    t1 = normalization_matrix(pt1)
+    t2 = normalization_matrix(pt2)
+    q1 = (t1 @ pt1[..., np.newaxis]).reshape((-1, 3))
+    q2 = (t2 @ pt2[..., np.newaxis]).reshape((-1, 3))
+
+    return t1.T @ eight_point(q1, q2) @ t2
+
+
 def draw_epilines(fname, pts, epipolar_lines):
     image = cv2.imread(fname)
     cv2.polylines(image, epipolar_lines, False, (255, 0, 0))
@@ -88,3 +109,17 @@ if __name__ == '__main__':
     print(f'mean distance between points and epipolar lines in image 2: {mean_dist2:.4f}\n')
     img = draw_epilines('image2.jpg', pts2, epi_lines2)
     cv2.imwrite(str(output_dir / 'a_img2.jpg'), img)
+
+    print('(b) normalized eight-point algorithm')
+    F_norm = normalized_eight_point(pts1, pts2)
+    print(f'Fundamental matrix = \n{F_norm}\n')
+
+    epi_lines1, mean_dist1 = epipolar_lines_from_f(F_norm, pts2, pts1)
+    print(f'mean distance between points and epipolar lines in image 1: {mean_dist1:.4f}')
+    img = draw_epilines('image1.jpg', pts1, epi_lines1)
+    cv2.imwrite(str(output_dir / 'b_img1.jpg'), img)
+
+    epi_lines2, mean_dist2 = epipolar_lines_from_f(F_norm.T, pts1, pts2)
+    print(f'mean distance between points and epipolar lines in image 2: {mean_dist2:.4f}')
+    img = draw_epilines('image2.jpg', pts2, epi_lines2)
+    cv2.imwrite(str(output_dir / 'b_img2.jpg'), img)
