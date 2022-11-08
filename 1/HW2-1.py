@@ -16,9 +16,9 @@ def read_points(filename):
 
 
 def eight_point(pt1, pt2):
-    uv_matrices = (pt1[:, :, np.newaxis] @ pt2[:, np.newaxis]).reshape((-1, 9))
+    uv_matrix = (pt1[:, :, np.newaxis] @ pt2[:, np.newaxis]).reshape((-1, 9))
 
-    f_hat = svd_least_square(uv_matrices)
+    f_hat = svd_least_square(uv_matrix)
     fundamental_mat = enforce_rank2(f_hat)
     return fundamental_mat
 
