@@ -25,8 +25,8 @@ def eight_point(pt1, pt2):
 
 def svd_least_square(uv_matrices):
     _, _, vt = np.linalg.svd(uv_matrices)
-    f = vt[-1].reshape((3, 3))
-    return f
+    x = vt[-1].reshape((3, 3))
+    return x
 
 
 def enforce_rank2(f_hat):
