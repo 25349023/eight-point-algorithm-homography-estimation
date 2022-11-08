@@ -5,7 +5,6 @@ import cv2
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import tqdm
 
 
 def svd_least_square(a_matrix):
@@ -23,46 +22,31 @@ def relation_matrix(pt1, pt2):
     )
 
 
-def warp_grid(homography, target_shape):
+def warp_grid(homography, source_shape, target_shape):
     width, height = target_shape[:2]
     pixel_indices = np.array(list(itertools.product(range(width), range(height), [1])))
 
     warp_matrix = (homography @ pixel_indices[..., np.newaxis]).reshape((-1, 3))
     warp_matrix = (warp_matrix / warp_matrix[:, 2:])
 
+    within_bounds = ((0 <= warp_matrix[:, 0]) & (warp_matrix[:, 0] < source_shape[0] - 1) &
+                     (0 <= warp_matrix[:, 1]) & (warp_matrix[:, 1] < source_shape[1] - 1))
+    pixel_indices = pixel_indices[within_bounds]
+    warp_matrix = warp_matrix[within_bounds]
+
     warp_pixel = warp_matrix.astype(int)
     warp_diff = warp_matrix % 1
-    return warp_matrix, warp_pixel, warp_diff
+    return pixel_indices, warp_pixel, warp_diff
 
 
-# def bilinear_pixel_color(src, x, y):
-#     if x < 0 or x >= src.shape[0] - 1 or y < 0 or y >= src.shape[1] - 1:
-#         return np.array([0, 0, 0])
-#
-#     px, py = int(x), int(y)
-#     a = src[px, py]
-#     b = src[px, py + 1]
-#     c = src[px + 1, py]
-#     d = src[px + 1, py + 1]
-#     dx, dy = x % 1, y % 1
-#
-#     return (a * dy + b * (1 - dy)) * dx + (c * dy + d * (1 - dy)) * (1 - dx)
+def bilinear_pixel_color(src, pixels, dw):
+    a = src[pixels[:, 0], pixels[:, 1]]
+    b = src[pixels[:, 0], pixels[:, 1] + 1]
+    c = src[pixels[:, 0] + 1, pixels[:, 1]]
+    d = src[pixels[:, 0] + 1, pixels[:, 1] + 1]
 
-
-# [TODO] speed up bilinear interpolation
-
-def bilinear_pixel_color(src, px, py, dx, dy):
-    if px < 0 or px >= src.shape[0] - 1 or py < 0 or py >= src.shape[1] - 1:
-        return np.array([0, 0, 0])
-
-    # px, py = int(x), int(y)
-    a = src[px, py]
-    b = src[px, py + 1]
-    c = src[px + 1, py]
-    d = src[px + 1, py + 1]
-    # dx, dy = x % 1, y % 1
-
-    return (a * dy + b * (1 - dy)) * dx + (c * dy + d * (1 - dy)) * (1 - dx)
+    return ((a * dw[:, 1:2] + b * (1 - dw[:, 1:2])) * dw[:, 0:1] +
+            (c * dw[:, 1:2] + d * (1 - dw[:, 1:2])) * (1 - dw[:, 0:1]))
 
 
 def draw_selected_polygon(image, polygon):
@@ -99,20 +83,15 @@ if __name__ == '__main__':
 
     H = svd_least_square(A)
     # H is target -> source
-    print(f'homography = \n{H}')
+    print(f'target -> source homography = \n{H}')
 
     source = cv2.imread('Delta-Building.jpg')
     selected_img = draw_selected_polygon(source, pts2)
     cv2.imwrite(str(output_dir / 'selected_img.jpg'), selected_img)
 
     target = np.zeros_like(source)
-    W, Wp, dW = warp_grid(H, target.shape)
+    valid_idx, Wp, dW = warp_grid(H, source.shape, target.shape)
 
-    for m in tqdm.tqdm(range(W.shape[0]), desc='warping...'):
-        warp_pt = Wp[m]
-        warp_dpt = dW[m]
-        i, j = divmod(m, target.shape[1])
-        target[i, j] = bilinear_pixel_color(source, warp_pt[0], warp_pt[1],
-                                            warp_dpt[0], warp_dpt[1])
+    target[valid_idx[:, 0], valid_idx[:, 1]] = bilinear_pixel_color(source, Wp, dW)
 
     cv2.imwrite(str(output_dir / 'rectified_img.jpg'), target)
