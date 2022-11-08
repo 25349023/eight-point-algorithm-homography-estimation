@@ -45,8 +45,8 @@ def bilinear_pixel_color(src, pixels, dw):
     c = src[pixels[:, 0] + 1, pixels[:, 1]]
     d = src[pixels[:, 0] + 1, pixels[:, 1] + 1]
 
-    return ((a * dw[:, 1:2] + b * (1 - dw[:, 1:2])) * dw[:, 0:1] +
-            (c * dw[:, 1:2] + d * (1 - dw[:, 1:2])) * (1 - dw[:, 0:1]))
+    return ((a * (1 - dw[:, 1:2]) + b * dw[:, 1:2]) * (1 - dw[:, 0:1]) +
+            (c * (1 - dw[:, 1:2]) + d * dw[:, 1:2]) * (dw[:, 0:1]))
 
 
 def draw_selected_polygon(image, polygon):
